@@ -10,7 +10,7 @@ import os
 
 # === Cấu hình chủ đề và số phần ===
 TOPIC = "Người mẹ bán rau già nuôi con đỗ đại học"
-NUM_PARTS = 2  # <== Số phần muốn tạo
+NUM_PARTS = 10  # <== Số phần muốn tạo
 
 # === Slugify để tạo tên thư mục an toàn ===
 def slugify(text):
@@ -96,8 +96,6 @@ def merge_audio_files(output_file, pattern, num_parts):
 
 # === Luồng chính ===
 def main():
-    messages = [{"role": "user", "content": INITIAL_PROMPT}]
-
     # Tạo thư mục riêng cho mỗi chủ đề
     output_dir = os.path.join("output", FILENAME_BASE)
     os.makedirs(output_dir, exist_ok=True)
@@ -105,9 +103,33 @@ def main():
     output_script = os.path.join(output_dir, f"{FILENAME_BASE}.txt")
     output_clean = os.path.join(output_dir, f"{FILENAME_BASE}-clean.txt")
 
+    messages = []  # bắt đầu chuỗi hội thoại
+
     for i in range(NUM_PARTS):
         print(f"\n🟡 Đang lấy phần {i+1}...")
 
+        # Prompt động theo từng phần
+        if i == 0:
+            prompt = (
+                f"Viết phần mở đầu của một câu chuyện cảm động với chủ đề: '{TOPIC}'. "
+                "Viết bằng giọng văn tự sự, cảm xúc, có thể đọc to bằng giọng nói. "
+                "Không dùng dấu * hoặc mô tả điện ảnh. Khoảng 500 từ. Dừng ở đoạn mở bài."
+            )
+            messages = [{"role": "user", "content": prompt}]
+        else:
+            if i == NUM_PARTS - 1:
+                continuation = (
+                    "Viết phần kết của câu chuyện. Kết lại bằng cảm xúc sâu lắng, đọng lại trong lòng người nghe. "
+                    "Không lặp lại phần trước. Khoảng 500 từ."
+                )
+            else:
+                continuation = (
+                    "Viết tiếp phần thân câu chuyện, liền mạch với phần trước. "
+                    "Không nhắc lại nội dung cũ. Khoảng 500 từ."
+                )
+            messages.append({"role": "user", "content": continuation})
+
+        # Gọi OpenRouter
         reply = call_openrouter(messages)
         if not reply or len(reply.strip()) < 50:
             print(f"⚠️ Nội dung phần {i+1} rỗng hoặc quá ngắn, bỏ qua.")
@@ -131,12 +153,8 @@ def main():
         asyncio.run(create_audio_from_text(cleaned_text, audio_filename))
         print(f"🎧 Đã tạo file âm thanh: {audio_filename}")
 
-        # Chuỗi hội thoại tiếp nối
+        # Thêm đoạn đã nhận vào messages để giữ logic
         messages.append({"role": "assistant", "content": reply})
-        messages.append({
-            "role": "user",
-            "content": "Viết tiếp phần sau, liền mạch cảm xúc và nội dung, không lặp lại phần trước."
-        })
 
         time.sleep(10)
 
@@ -145,6 +163,5 @@ def main():
     merge_audio_files(final_audio_file, os.path.join(output_dir, f"{FILENAME_BASE}-part-{{}}.mp3"), NUM_PARTS)
 
     print(f"\n🎉 Hoàn tất. Kịch bản và audio đã lưu tại: {output_dir}")
-
 if __name__ == "__main__":
     main()
