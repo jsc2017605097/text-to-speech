@@ -3,3 +3,6 @@ edge-tts
 pydub
 openai-whisper
 ffmpeg-python
+PyQt5
+moviepy==1.0.3
+pyinstaller
