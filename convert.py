@@ -13,10 +13,10 @@ if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     ffmpeg_path = os.path.join(base_path, "ffmpeg.exe")
 else:
-    ffmpeg_path = "ffmpeg.exe"  # hoặc đường dẫn chuẩn khi chạy python
+    ffmpeg_path = "ffmpeg.exe"
 
 AudioSegment.converter = ffmpeg_path
-# === Slugify để tạo tên thư mục an toàn ===
+
 def slugify(text):
     text = unicodedata.normalize('NFD', text)
     text = text.encode('ascii', 'ignore').decode('utf-8')
@@ -27,7 +27,6 @@ def slugify(text):
 MODEL = "deepseek/deepseek-r1:free"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# === Làm sạch văn bản cho TTS ===
 def clean_for_tts(text):
     text = re.sub(r"\*\*.*?\*\*", "", text)
     text = re.sub(r"\*.*?\*", "", text)
@@ -36,14 +35,11 @@ def clean_for_tts(text):
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
-# === Chuyển văn bản thành file âm thanh ===
-async def create_audio_from_text(text, output_path):
-    communicate = edge_tts.Communicate(text=text, voice="vi-VN-HoaiMyNeural")
+async def create_audio_from_text(text, output_path, voice="vi-VN-HoaiMyNeural"):
+    communicate = edge_tts.Communicate(text=text, voice=voice)
     await communicate.save(output_path)
 
-# === Gộp các file âm thanh ===
 def merge_audio_files(output_file, pattern, num_parts):
-    # Dùng print hay log_func tuỳ theo gọi từ đâu
     print("\n🔄 Đang gộp các phần âm thanh lại thành 1 file...")
     merged = AudioSegment.empty()
 
@@ -58,8 +54,7 @@ def merge_audio_files(output_file, pattern, num_parts):
     merged.export(output_file, format="mp3")
     print(f"✅ Đã tạo file gộp: {output_file}")
 
-# === Hàm chính chạy chuyển đổi ===
-def run_convert(topic, api_key, num_parts=12, log_func=print):
+def run_convert(topic, api_key, num_parts=12, log_func=print, voice="vi-VN-HoaiMyNeural"):
     log_func(f"🚀 Bắt đầu chạy với chủ đề: {topic}")
     log_func(f"🔑 Dùng API key: {api_key[:6]}***")
     log_func(f"📄 Số phần: {num_parts}")
@@ -142,7 +137,7 @@ def run_convert(topic, api_key, num_parts=12, log_func=print):
             f.write(cleaned_text + "\n")
 
         audio_filename = os.path.join(output_dir, f"{FILENAME_BASE}-part-{i+1}.mp3")
-        asyncio.run(create_audio_from_text(cleaned_text, audio_filename))
+        asyncio.run(create_audio_from_text(cleaned_text, audio_filename, voice=voice))
         log_func(f"🎧 Đã tạo file âm thanh: {audio_filename}")
 
         messages.append({"role": "assistant", "content": reply})
@@ -156,9 +151,7 @@ def run_convert(topic, api_key, num_parts=12, log_func=print):
 
     return final_audio_file
 
-# Cho chạy thử file độc lập
 if __name__ == "__main__":
-    # Bạn có thể thay bằng key của bạn để test
     TEST_API_KEY = "sk-or-v1-your_api_key_here"
     TEST_TOPIC = "Tại Sao Nhật Bản Gần Như Không Có Trộm Cắp?"
     run_convert(TEST_TOPIC, TEST_API_KEY)

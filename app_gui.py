@@ -2,7 +2,8 @@ import sys
 import os
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QFileDialog, QSlider, QHBoxLayout
+    QPushButton, QTextEdit, QFileDialog, QSlider, QHBoxLayout,
+    QComboBox
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon
@@ -13,7 +14,7 @@ class ConvertThread(QThread):
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, topic, api_key, num_parts, video_path=None, music_path=None, music_volume=30):
+    def __init__(self, topic, api_key, num_parts, video_path=None, music_path=None, music_volume=30, voice="vi-VN-HoaiMyNeural"):
         super().__init__()
         self.topic = topic
         self.api_key = api_key
@@ -21,13 +22,14 @@ class ConvertThread(QThread):
         self.video_path = video_path
         self.music_path = music_path
         self.music_volume = music_volume
+        self.voice = voice
 
     def run(self):
         def log_func(msg):
             self.log_signal.emit(msg)
 
         try:
-            final_audio = run_convert(self.topic, self.api_key, self.num_parts, log_func=log_func)
+            final_audio = run_convert(self.topic, self.api_key, self.num_parts, log_func=log_func, voice=self.voice)
             self.log_signal.emit("✅ Hoàn tất chuyển đổi âm thanh!")
 
             if self.video_path and os.path.exists(self.video_path):
@@ -51,7 +53,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Dâu Tây Video Maker")
-        if getattr(sys, 'frozen', False):  # Khi đã đóng gói bằng PyInstaller
+        if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.abspath(".")
@@ -75,6 +77,15 @@ class MainWindow(QWidget):
         layout.addWidget(QLabel("📑 Số phần câu chuyện:"))
         self.num_parts_input = QLineEdit("10")
         layout.addWidget(self.num_parts_input)
+
+        # Giọng đọc
+        layout.addWidget(QLabel("🎤 Chọn giọng đọc:"))
+        self.voice_selector = QComboBox()
+        self.voice_selector.addItems([
+            "Nữ - vi-VN-HoaiMyNeural",
+            "Nam - vi-VN-NamMinhNeural"
+        ])
+        layout.addWidget(self.voice_selector)
 
         # Video mẫu
         layout.addWidget(QLabel("📼 Chọn video mẫu:"))
@@ -160,6 +171,8 @@ class MainWindow(QWidget):
 
         num_parts = int(num_parts_str)
         music_volume = self.volume_slider.value()
+        voice_text = self.voice_selector.currentText()
+        voice = voice_text.split(" - ")[1].strip()
 
         self.log_output.clear()
         self.btn_start.setEnabled(False)
@@ -169,7 +182,8 @@ class MainWindow(QWidget):
             topic, api_key, num_parts,
             video_path=self.selected_video_path,
             music_path=self.selected_music_path,
-            music_volume=music_volume
+            music_volume=music_volume,
+            voice=voice
         )
         self.thread.log_signal.connect(self.append_log)
         self.thread.finished_signal.connect(self.convert_finished)
