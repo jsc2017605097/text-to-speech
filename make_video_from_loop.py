@@ -5,6 +5,12 @@ from moviepy.editor import VideoFileClip, AudioFileClip
 import re
 
 def make_video_loop_with_ffmpeg(video_path, audio_path, output_path, log_func=print, music_path=None, music_volume=30):
+    import os
+    import subprocess
+    import math
+    import re
+    from moviepy.editor import VideoFileClip, AudioFileClip
+
     if not os.path.exists(video_path) or not os.path.exists(audio_path):
         log_func("❌ Không tìm thấy file video hoặc audio.")
         return
@@ -21,53 +27,49 @@ def make_video_loop_with_ffmpeg(video_path, audio_path, output_path, log_func=pr
         video_clip.close()
         audio_clip.close()
 
-        num_loops = math.ceil(audio_duration / video_duration)
+        num_loops = math.ceil(audio_duration / video_duration) - 1
 
-        log_func(f"📺 Video: {video_duration:.2f}s, 🎵 Audio: {audio_duration:.2f}s, 🔁 Loop: {num_loops}")
+        log_func(f"📺 Video: {video_duration:.2f}s, 🎵 Audio: {audio_duration:.2f}s, 🔁 Loop: {num_loops + 1}")
+
         ffmpeg_path = os.path.abspath("ffmpeg.exe")
-
-        # Prepare input args
-        input_args = []
-        for _ in range(num_loops):
-            input_args.extend(["-i", video_path])
-        input_args.extend(["-i", audio_path])
-        if music_path:
-            input_args.extend(["-i", music_path])
-
-        # Video concat filter
-        filter_parts = [f"[{i}:v]" for i in range(num_loops)]
-        filter_video = (
-            "".join(filter_parts) +
-            f"concat=n={num_loops}:v=1:a=0," +
-            "scale=1280:720:force_original_aspect_ratio=decrease," +
-            "pad=1280:720:(ow-iw)/2:(oh-ih)/2[outv]"
-        )
-
-        # Audio mixing logic
-        if music_path:
-            music_vol = music_volume / 100
-            filter_audio = (
-                f"[{num_loops + 1}:a]volume={music_vol}[bg];"
-                f"[{num_loops}:a][bg]amix=inputs=2:duration=shortest:weights=1 {music_vol}[outa]"
-            )
-        else:
-            filter_audio = f"[{num_loops}:a]anull[outa]"
-
-        filter_complex = f"{filter_video};{filter_audio}"
 
         cmd = [
             ffmpeg_path,
-            *input_args,
+            "-stream_loop", str(num_loops),
+            "-i", video_path,
+            "-i", audio_path
+        ]
+
+        if music_path:
+            cmd.extend(["-i", music_path])
+
+        filter_video = (
+            "scale=1280:720:force_original_aspect_ratio=decrease,"
+            "pad=1280:720:(ow-iw)/2:(oh-ih)/2[outv]"
+        )
+
+        if music_path:
+            music_vol = music_volume / 100
+            filter_audio = (
+                f"[2:a]volume={music_vol}[bg];"
+                f"[1:a][bg]amix=inputs=2:duration=longest:dropout_transition=2[outa]"
+            )
+        else:
+            filter_audio = "[1:a]anull[outa]"
+
+        filter_complex = f"{filter_video};{filter_audio}"
+
+        cmd.extend([
             "-filter_complex", filter_complex,
             "-map", "[outv]",
             "-map", "[outa]",
             "-c:v", "libx264",
             "-preset", "fast",
             "-c:a", "aac",
-            "-shortest",
+            "-to", str(audio_duration),   # Cắt video chính xác bằng thời gian audio
             "-y",
             output_path
-        ]
+        ])
 
         log_func("🎬 Bắt đầu render video...")
 
@@ -80,10 +82,10 @@ def make_video_loop_with_ffmpeg(video_path, audio_path, output_path, log_func=pr
         for line in process.stderr:
             line = line.strip()
             if "time=" in line:
-                match = re.search(r"time=(\d{2}:\d{2}:\d{2}\.\d{2})", line)
+                match = re.search(r"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})", line)
                 if match:
-                    h, m, s = map(float, match.group(1).replace(":", " ").split())
-                    current_time = h * 3600 + m * 60 + s
+                    h, m, s = match.groups()
+                    current_time = int(h)*3600 + int(m)*60 + float(s)
                     percent = (current_time / audio_duration) * 100
                     log_func(f"⏳ Render: {percent:.2f}%")
 
