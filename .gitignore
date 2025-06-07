@@ -3,3 +3,6 @@ output
 build
 __pycache__
 dist
+audio.mp3
+final_video*
+video*
