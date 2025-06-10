@@ -32,22 +32,34 @@ def slugify(text: str) -> str:
 
 def clean_for_tts(text: str) -> str:
     """
-    Loại bỏ markdown, chú thích, prompt gốc, các phần gợi ý và mọi thứ thừa sau story.
+    Làm sạch văn bản để chuyển sang TTS:
+    - Giữ lại chữ cái (cả tiếng Việt), số và dấu câu cơ bản
+    - Loại bỏ ký tự đặc biệt, dấu ngoặc, markdown...
     """
-    # Xóa markdown bold/italic
+    import unicodedata
+
+    # Chuẩn hóa Unicode để tránh ký tự lạ
+    text = unicodedata.normalize('NFKC', text)
+
+    # Loại bỏ markdown ** ** hoặc * *
     text = re.sub(r"\*\*.*?\*\*", "", text)
     text = re.sub(r"\*.*?\*", "", text)
-    # Xóa nội dung trong ngoặc
-    text = re.sub(r"\(.*?\)", "", text)
-    # Xóa các chỉ dẫn camera
+
+    # Xóa nội dung trong ngoặc tròn ( ), vuông [ ], nhọn < >, ngoặc kép
+    text = re.sub(r"[\(\)\[\]\{\}<>\"“”‘’']", "", text)
+
+    # Xóa các hướng dẫn như "Camera:..." hoặc "--- PHẦN X ---"
     text = re.sub(r"Camera.*?\.", "", text)
-    # Loại bỏ bất cứ phần gợi ý hoặc meta (bắt đầu bằng "Nếu bạn muốn" hoặc "--- PHẦN X ---")
     text = re.split(r"(?m)^(Nếu bạn muốn|---\s*PHẦN\s*\d+\s*---)", text)[0]
-    # Xóa dấu ngoặc kép để tránh lỗi đọc TTS
-    text = text.replace('"', '')
-    # Xóa khoảng trắng thừa
+
+    # Chỉ giữ lại các ký tự hợp lệ cho TTS: chữ cái (có dấu), số và dấu câu thường
+    text = re.sub(r"[^a-zA-ZÀ-ỹ0-9\s\.,!?:;\-…]", "", text)
+
+    # Rút gọn khoảng trắng
     text = re.sub(r"\s+", " ", text).strip()
+
     return text
+
 
 
 async def create_audio_from_text(text: str, output_path: str, voice: str = "vi-VN-HoaiMyNeural"):
@@ -120,16 +132,34 @@ def run_convert(
                 }
             ]
             prompt = (
-                f"Viết phần mở đầu của câu chuyện cảm động với chủ đề: '{topic}'. "
-                "Giọng văn tự sự, cảm xúc, khoảng 500 từ, dừng ở đoạn mở bài. "
-                "Chỉ trả nội dung kịch bản, không thêm phần tóm tắt hay chú thích."
+                f"Viết phần mở đầu của câu chuyện cảm động với chủ đề: '{topic}'.\n\n"
+                "Yêu cầu:\n"
+                "- Viết giọng văn tự sự, cảm xúc, khoảng 500 từ.\n"
+                "- KHÔNG sử dụng bất kỳ ký hiệu đặc biệt, dấu ngoặc kép, dấu ngoặc đơn, hoặc dấu ngoặc tròn.\n"
+                "- KHÔNG dùng markdown (*, **, #, v.v.)\n"
+                "- Giữ lại dấu chấm, phẩy, chấm than, chấm hỏi và các dấu câu thông thường.\n"
+                "- Trả về nội dung thuần văn bản, sạch, không định dạng hoặc chú thích thêm.\n\n"
+                "Chỉ trả lại nội dung kịch bản, không thêm phần meta hoặc hướng dẫn."
             )
+
             messages.append({"role": "user", "content": prompt})
         else:
             if i == num_parts - 1:
-                cont = "Viết phần kết của câu chuyện, kết bằng cảm xúc sâu lắng, khoảng 500 từ."
+                cont = (
+                    "Viết phần kết của câu chuyện, kết bằng cảm xúc sâu lắng, khoảng 500 từ.\n\n"
+                    "Yêu cầu giống như phần trước:\n"
+                    "- KHÔNG sử dụng dấu ngoặc, markdown hoặc ký hiệu đặc biệt.\n"
+                    "- Chỉ trả lại văn bản sạch với dấu câu thông thường."
+                )
+
             else:
-                cont = "Viết tiếp phần thân, liền mạch, không lặp lại, khoảng 500 từ."
+                cont = (
+                    "Viết tiếp phần thân của câu chuyện (liền mạch, không lặp lại), khoảng 500 từ.\n\n"
+                    "Yêu cầu giống như phần trước:\n"
+                    "- KHÔNG sử dụng dấu ngoặc, markdown hoặc ký hiệu đặc biệt.\n"
+                    "- Chỉ trả lại văn bản sạch với dấu câu thông thường."
+                )
+
             messages.append({"role": "user", "content": cont})
 
         reply = call_openrouter(messages)
