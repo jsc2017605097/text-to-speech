@@ -1,0 +1,104 @@
+1
+00:00:00,000 --> 00:00:01,219
+Đêm đã khuy.
+
+2
+00:00:01,760 --> 00:00:08,000
+Anh đèn từ mang hình máy tính các một việc sáng mỏng măn trên bàn làm việc lộng sụng giấy tờ và những chi cốt ca phê mùi lạnh.
+
+3
+00:00:08,560 --> 00:00:16,059
+Tiến gõ bàn phím đều đều, dùng dập, rồi lại ngừng bắt, như hơi thở của một người đang cố gắng giữ nghiệp sống cho mình trong tăng phòng tính lạnh.
+
+4
+00:00:16,699 --> 00:00:21,460
+Tôi nhìn 100% vào trong các trẻ giài vô tượng trên mang hình, từ hỏi không biết từ bao giờ,
+
+5
+00:00:21,460 --> 00:00:25,460
+thứ ngô ngữ máy mốc này đã trở thành tiếng nói duy nhất giữ tôi và thế giới.
+
+6
+00:00:26,179 --> 00:00:32,780
+Mời năm trước, khi lần đầu đặt tay lên chiếc bàn phím của kỳ trong thư viện trường đại học, tôi đã tưởng tượng về một tương lai rực rở.
+
+7
+00:00:33,619 --> 00:00:40,579
+Những dòng có sẽ mở ra vũ trụ vô biên của sáng tạo, đời tôi có thể xây dựng những điều không tưởng, thay đổi cuộc đời hàng triệu người.
+
+8
+00:00:41,420 --> 00:00:49,899
+Nhưng giờ đây, ngồi đối diện với bức tượng lạnh lẽo của căn hộ một phòng ở Saigon, tôi bổng thấy mình như kể lạc lỏng giữ cuộc thách mạng mà chính mình từng mơ ước tham gia.
+
+9
+00:00:50,740 --> 00:00:54,740
+Ai viết cốt nhăn hơn, chính sát hơn và không bao giờ mệt mỏi.
+
+10
+00:00:55,579 --> 00:01:06,219
+Những dự án stát áp một thời là niềm từ hào của tôi giờ đã thành dự cổ tích kể trong mắt thế hệ trẻ, họ nói về lập trình như một kĩ năng cơ bản, không hơn, trong thời đại mà mấy móc có thể học tác tự hoàn thiện.
+
+11
+00:01:06,980 --> 00:01:12,260
+Cần gió đêm luộc qua kê cửa số hế mở, mang theo hơi thở ẩm ước của một cơn mưa chưa kịp trời.
+
+12
+00:01:13,099 --> 00:01:17,459
+Tôi với tay tắc đi thông báo trên điện thoại một bài báo mới với tiêu đề chói loa.
+
+13
+00:01:18,459 --> 00:01:20,099
+Lòng bàn tay đổ mồ hôi.
+
+14
+00:01:20,900 --> 00:01:24,659
+Chỉ vài năm trước, tôi từng kỳ cực trước những dự báo bì qua như thế.
+
+15
+00:01:25,500 --> 00:01:36,379
+Nhưng giờ, khi nhìn lại trạng đường mình đã đi, từ một cậu sinh viên háo hước biết ứng dụng đầu tay bằng gia vwa đến một kĩ sư phần mềm luôn thức trắng để phích bút, tôi không dám chắc liệu mình có đang đứng trên bờ vực của sự lỗi thời.
+
+16
+00:01:37,180 --> 00:01:43,140
+Có lẽ, thứ gì nhất không thay đổi chính là sự thay đổi, nhưng tại sao nó lại khiến người ta đau đứng đến thế.
+
+17
+00:01:43,939 --> 00:01:46,859
+Tính trung điện thoại Trung lên, các ngang dòng xuy tưởng.
+
+18
+00:01:47,700 --> 00:01:54,180
+Đó là tinh nhắn của mình, đứa bản cùng qua hồi đại học, giờ đang làm việc cho một tập đoàn công nghệ lớn ở thông luận silicone.
+
+19
+00:01:55,060 --> 00:02:03,900
+Tôi nhắm mắc lại, hình ảnh những bụi trưa hề hai đứa ngồi trong quán cả phê viễn hề bằng về ước mơ với phần mềm thay đổi thế giới, trật hiện về như một thức phim của kĩ.
+
+20
+00:02:04,739 --> 00:02:11,139
+Dờ, mình vẫn là một lập trình viên, nhưng công việc của cậu ấy là hướng liện AI để chúng thấy thế giần các đồng nghiệt.
+
+21
+00:02:12,020 --> 00:02:15,180
+Tôi tự hỏi, có phải chúng tôi đang tự đau hố cho mình.
+
+22
+00:02:16,020 --> 00:02:18,460
+Màn hình mấy tính trật tối om vì hết tin.
+
+23
+00:02:19,300 --> 00:02:29,300
+Trong khoảng khách bất ngợi, tôi nhìn thấy khu mặc mình phản chiếu trên nền đen đôi mắt thâm quần, máy tóc rối buồn và nụ cười gượng gạo của một người đang cố nếu dựa thứ gì đó sắp tục khỏi tay.
+
+24
+00:02:30,139 --> 00:02:32,020
+Tương lai của lập trình viên là gì?
+
+25
+00:02:32,860 --> 00:02:40,620
+Liệu chúng ta sẽ trở thành những người thợ sử chữ cho cố máy mình tạo ra, hay sẽ khắc lên mình vài trò mới, như những nghệ nhân thổi hôn vào tương dòng lệnh.
+
+26
+00:02:41,500 --> 00:02:45,139
+Câu hỏi ấy cứ cuốn quan, như đoạn cốc lỗi không tìm ra ngư nhân.
+
