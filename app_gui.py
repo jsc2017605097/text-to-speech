@@ -2,25 +2,28 @@ import sys
 import os
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QComboBox, QProgressBar
+    QPushButton, QTextEdit, QComboBox, QProgressBar, QCheckBox
 )
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon
 from convert import run_convert
+from subtitle_generator import generate_subtitle
 
 
 class ConvertThread(QThread):
-    """Thread chỉ tạo AUDIO (mp3) từ chủ đề – KHÔNG xử lý video"""
+    """Thread tạo AUDIO (mp3) từ chủ đề và có thể tạo phụ đề"""
 
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, topic: str, api_key: str, num_parts: int, voice: str) -> None:
+    def __init__(self, topic: str, api_key: str, num_parts: int, voice: str, create_subtitle: bool, whisper_model: str) -> None:
         super().__init__()
         self.topic = topic
         self.api_key = api_key
         self.num_parts = num_parts
         self.voice = voice
+        self.create_subtitle = create_subtitle
+        self.whisper_model = whisper_model
 
     def run(self):
         def log_func(msg: str):
@@ -35,6 +38,16 @@ class ConvertThread(QThread):
                 voice=self.voice,
             )
             self.log_signal.emit("✅ Hoàn tất tạo audio!")
+            
+            # Tạo phụ đề nếu được chọn
+            if self.create_subtitle:
+                self.log_signal.emit("🎬 Đang tạo phụ đề...")
+                try:
+                    subtitle_file = generate_subtitle(final_audio, self.whisper_model, log_func)
+                    self.log_signal.emit(f"✅ Đã tạo phụ đề: {subtitle_file}")
+                except Exception as e:
+                    self.log_signal.emit(f"❌ Lỗi tạo phụ đề: {e}")
+                    
             self.finished_signal.emit(final_audio)
         except Exception as e:
             self.log_signal.emit(f"❌ Lỗi: {e}")
@@ -51,7 +64,7 @@ class MainWindow(QWidget):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        self.resize(500, 500)
+        self.resize(500, 600)
         layout = QVBoxLayout()
 
         # ---------- Thông tin tạo audio ----------
@@ -77,6 +90,25 @@ class MainWindow(QWidget):
             ]
         )
         layout.addWidget(self.voice_selector)
+
+        # ---------- Tùy chọn tạo phụ đề ----------
+        self.subtitle_checkbox = QCheckBox("🎬 Tạo phụ đề (SRT file)")
+        self.subtitle_checkbox.setChecked(False)
+        self.subtitle_checkbox.toggled.connect(self.toggle_whisper_model)
+        layout.addWidget(self.subtitle_checkbox)
+
+        layout.addWidget(QLabel("🤖 Whisper Model:"))
+        self.whisper_model_selector = QComboBox()
+        self.whisper_model_selector.addItems([
+            "tiny - Nhanh nhất, chất lượng thấp (~39MB)",
+            "base - Cân bằng tốc độ và chất lượng (~74MB)", 
+            "small - Chất lượng tốt (~244MB)",
+            "medium - Chất lượng cao (~769MB)",
+            "large - Chất lượng tốt nhất (~1550MB)"
+        ])
+        self.whisper_model_selector.setCurrentIndex(1)  # Default: base
+        self.whisper_model_selector.setEnabled(False)  # Disable ban đầu
+        layout.addWidget(self.whisper_model_selector)
 
         # ---------- Progress & log ----------
         self.progress_bar = QProgressBar()
@@ -133,11 +165,21 @@ class MainWindow(QWidget):
 
         num_parts = int(num_parts_str)
         voice = self.voice_selector.currentText().split(" - ")[1].strip()
+        create_subtitle = self.subtitle_checkbox.isChecked()
+        whisper_model = self.whisper_model_selector.currentText().split(" - ")[0].strip()
 
-        self.thread = ConvertThread(topic, api_key, num_parts, voice)
+        self.thread = ConvertThread(topic, api_key, num_parts, voice, create_subtitle, whisper_model)
         self.thread.log_signal.connect(self.handle_log_signal)
         self.thread.finished_signal.connect(self.convert_finished)
         self.thread.start()
+
+    # --------------------------------------------------
+    # UI Event Handlers
+    # --------------------------------------------------
+
+    def toggle_whisper_model(self, checked: bool):
+        """Bật/tắt dropdown model khi checkbox được chọn/bỏ chọn"""
+        self.whisper_model_selector.setEnabled(checked)
 
     # --------------------------------------------------
     # Slots for thread signals
