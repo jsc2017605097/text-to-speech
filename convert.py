@@ -19,8 +19,31 @@ else:
     ffmpeg_path = "ffmpeg.exe"
 AudioSegment.converter = ffmpeg_path
 
-MODEL = "deepseek/deepseek-r1:free" # Sử dụng model mà bạn đã chỉ định
+MODEL = "deepseek/deepseek-r1:free"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+def get_mc_info(voice: str) -> dict:
+    """
+    Trả về thông tin MC dựa trên giọng đọc được chọn
+    """
+    voice_to_mc = {
+        "vi-VN-NamMinhNeural": {
+            "name": "Hoàng Minh",
+            "gender": "nam",
+            "description": "một người dẫn chương trình nam chuyên nghiệp, giọng điệu ấm áp, uy tín"
+        },
+        "vi-VN-HoaiMyNeural": {
+            "name": "Hoài My", 
+            "gender": "nữ",
+            "description": "một người dẫn chương trình nữ chuyên nghiệp, giọng điệu ngọt ngào, thân thiện"
+        }
+    }
+    
+    return voice_to_mc.get(voice, {
+        "name": "MC",
+        "gender": "chưa xác định", 
+        "description": "một người dẫn chương trình chuyên nghiệp"
+    })
 
 def slugify(text: str) -> str:
     # Chuyển Unicode về ASCII, lowercase, thay ký tự không alnum thành dấu '-'
@@ -52,8 +75,7 @@ def clean_for_tts(text: str) -> str:
     text = re.sub(r"Camera.*?\.", "", text)
     text = re.split(r"(?m)^(Nếu bạn muốn|---\s*PHẦN\s*\d+\s*---)", text)[0]
 
-    # Chỉ giữ lại các ký tự hợp lệ cho TTS: chữ cái (có dấu), số và dấu câu thường
-    # Regex này giữ lại các ký tự tiếng Việt, chữ cái Latin, số, dấu câu cơ bản và khoảng trắng
+    # Chỉ giữ lại các ký tự hợp lệ cho TTS: chữ cái (có dấu), số, dấu câu cơ bản và khoảng trắng
     text = re.sub(r"[^a-zA-ZÀ-ỹ0-9\s\.,!?:;\-…]", "", text)
 
     # Rút gọn khoảng trắng
@@ -61,7 +83,7 @@ def clean_for_tts(text: str) -> str:
 
     return text
 
-async def create_audio_from_text(text: str, output_path: str, voice: str = "vi-VN-HoaiMyNeural"):
+async def create_audio_from_text(text: str, output_path: str, voice: str = "vi-VN-NamMinhNeural"):
     communicate = edge_tts.Communicate(text=text, voice=voice)
     await communicate.save(output_path)
 
@@ -131,11 +153,22 @@ def run_convert(
     api_key: str,
     num_parts: int = 12,
     log_func=print,
-    voice: str = "vi-VN-HoaiMyNeural"
+    voice: str = "vi-VN-NamMinhNeural",
+    channel_name: str = "Tinh Hoa Á Đông"
 ) -> str:
     log_func(f"🚀 Bắt đầu chạy với chủ đề: {topic}")
     log_func(f"🔑 Dùng API key: {api_key[:6]}***")
     log_func(f"📄 Số phần dự kiến: {num_parts}")
+    log_func(f"🎤 Giọng đọc: {voice}")
+    log_func(f"📺 Kênh: {channel_name}")
+
+    # Lấy thông tin MC dựa trên giọng đọc
+    mc_info = get_mc_info(voice)
+    mc_name = mc_info["name"]
+    mc_gender = mc_info["gender"]
+    mc_description = mc_info["description"]
+    
+    log_func(f"🎭 MC được chọn: {mc_name} ({mc_gender})")
 
     HEADERS = {
         "Authorization": f"Bearer {api_key}",
@@ -222,6 +255,8 @@ QUAN TRỌNG: Mỗi phân đoạn phải có:
     # Save detailed outline
     with open(output_outline, "w", encoding="utf-8") as f:
         f.write(f"DÀN Ý CHI TIẾT CHO: {topic}\n")
+        f.write(f"KÊNH: {channel_name}\n")
+        f.write(f"MC: {mc_name} ({mc_gender})\n")
         f.write("="*50 + "\n\n")
         f.write(outline_content)
     
@@ -267,14 +302,16 @@ QUAN TRỌNG: Mỗi phân đoạn phải có:
         # Create detailed prompt based on part position
         if i == 0:
             user_prompt_content = f"""
-Viết phần mở đầu của câu chuyện dựa trên chủ đề: '{topic}'
+Viết phần mở đầu của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
 
 YÊU CẦU VIẾT:
+- Bắt đầu bằng lời chào: "Xin chào quý vị khán giả của kênh {channel_name}! Tôi là MC {mc_name}, rất vui được gặp lại các bạn trong chương trình hôm nay."
+- Giới thiệu chủ đề một cách hấp dẫn và tạo tò mò
+- Giọng điệu của MC {mc_gender} chuyên nghiệp, thân thiện, uy tín
 - Khoảng 500 từ
-- Giọng văn tự sự, cảm xúc, thu hút người nghe
 - TUÂN THỦ CHẶT CHẼ nội dung trong hướng dẫn trên
 - KHÔNG lệch khỏi chủ đề hoặc thêm thông tin không liên quan
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
@@ -284,7 +321,7 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
         elif i == num_parts - 1:
             user_prompt_content = f"""
-Viết phần kết thúc của câu chuyện dựa trên chủ đề: '{topic}'
+Viết phần kết thúc của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
@@ -295,6 +332,8 @@ NỐI TIẾP TỪ PHẦN TRƯỚC:
 YÊU CẦU VIẾT:
 - Khoảng 500 từ
 - Kết thúc có ý nghĩa, cảm động
+- Có lời cảm ơn khán giả và lời chào tạm biệt: "Cảm ơn quý vị đã theo dõi chương trình hôm nay. Hẹn gặp lại các bạn trong những chương trình tiếp theo của kênh {channel_name}. Chúc quý vị một ngày tốt lành!"
+- Giọng điệu MC {mc_gender} chuyên nghiệp, ấm áp
 - TUÂN THỦ CHẶT CHẼ nội dung trong hướng dẫn
 - Nối tiếp tự nhiên từ phần trước, KHÔNG lặp lại nội dung
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
@@ -304,7 +343,7 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
         else:
             user_prompt_content = f"""
-Viết tiếp phần {i+1} của câu chuyện dựa trên chủ đề: '{topic}'
+Viết tiếp phần {i+1} của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
@@ -314,9 +353,11 @@ NỐI TIẾP TỪ PHẦN TRƯỚC:
 
 YÊU CẦU VIẾT:
 - Khoảng 500 từ
-- TUÂN THỦ CHẶT CHẼ nội dung trong hướng dẫn trên
+- Giọng điệu MC {mc_gender} chuyên nghiệp, hấp dẫn, tạo kết nối với khán giả
+- TUÂN THỦ CHẶT CHẾ nội dung trong hướng dẫn trên
 - Nối tiếp tự nhiên từ phần trước, KHÔNG lặp lại nội dung
 - Phát triển câu chuyện theo đúng hướng đã định
+- Có thể sử dụng các câu giao tiếp với khán giả như "Quý vị có biết rằng...", "Điều thú vị là...", "Chúng ta cùng khám phá..."
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường
 
@@ -327,7 +368,8 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
             {
                 "role": "system",
                 "content": (
-                    "Bạn là trợ lý viết kịch bản chuyên nghiệp. "
+                    f"Bạn là MC {mc_name} của kênh '{channel_name}' - {mc_description}, "
+                    "có khả năng kể chuyện hấp dẫn và tạo kết nối với khán giả. "
                     "PHẢI tuân thủ chặt chẽ hướng dẫn được cung cấp. "
                     "KHÔNG được lệch chủ đề hoặc tự ý thêm nội dung không liên quan. "
                     "CHỈ trả về nội dung câu chuyện, không thêm bất kỳ meta hay giải thích nào."
@@ -374,6 +416,8 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
     )
     
     log_func(f"\n🎉 Hoàn tất!")
+    log_func(f"🎭 MC: {mc_name} ({mc_gender})")
+    log_func(f"📺 Kênh: {channel_name}")
     log_func(f"📄 Dàn ý chi tiết: {output_outline}")
     log_func(f"📝 Kịch bản gốc: {output_script}")
     log_func(f"🧹 Kịch bản clean: {output_clean}")

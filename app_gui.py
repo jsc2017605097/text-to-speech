@@ -16,7 +16,7 @@ class ConvertThread(QThread):
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, topic: str, api_key: str, num_parts: int, voice: str, create_subtitle: bool, whisper_model: str) -> None:
+    def __init__(self, topic: str, api_key: str, num_parts: int, voice: str, create_subtitle: bool, whisper_model: str, channel_name: str) -> None:
         super().__init__()
         self.topic = topic
         self.api_key = api_key
@@ -24,6 +24,7 @@ class ConvertThread(QThread):
         self.voice = voice
         self.create_subtitle = create_subtitle
         self.whisper_model = whisper_model
+        self.channel_name = channel_name
 
     def run(self):
         def log_func(msg: str):
@@ -36,6 +37,7 @@ class ConvertThread(QThread):
                 self.num_parts,
                 log_func=log_func,
                 voice=self.voice,
+                channel_name=self.channel_name
             )
             self.log_signal.emit("✅ Hoàn tất tạo audio!")
             
@@ -66,6 +68,11 @@ class MainWindow(QWidget):
 
         self.resize(500, 600)
         layout = QVBoxLayout()
+
+        # ---------- Tên kênh ----------
+        layout.addWidget(QLabel("📺 Tên kênh:"))
+        self.channel_name_input = QLineEdit("Tinh Hoa Á Đông")
+        layout.addWidget(self.channel_name_input)
 
         # ---------- Thông tin tạo audio ----------
         layout.addWidget(QLabel("🎯 Chủ đề:"))
@@ -135,10 +142,6 @@ class MainWindow(QWidget):
         # ---------- State ----------
         self.final_output_file: str | None = None
 
-    # --------------------------------------------------
-    # Core workflow
-    # --------------------------------------------------
-
     def start_convert(self):
         self.log_output.clear()
         self.progress_bar.setValue(0)
@@ -146,10 +149,15 @@ class MainWindow(QWidget):
         self.btn_open.setEnabled(False)
 
         # Validate input
+        channel_name = self.channel_name_input.text().strip()
         topic = self.topic_input.text().strip()
         api_key = self.api_key_input.text().strip()
         num_parts_str = self.num_parts_input.text().strip()
 
+        if not channel_name:
+            self.append_log("⚠️ Vui lòng nhập tên kênh!")
+            self.btn_start.setEnabled(True)
+            return
         if not topic:
             self.append_log("⚠️ Vui lòng nhập chủ đề!")
             self.btn_start.setEnabled(True)
@@ -168,22 +176,14 @@ class MainWindow(QWidget):
         create_subtitle = self.subtitle_checkbox.isChecked()
         whisper_model = self.whisper_model_selector.currentText().split(" - ")[0].strip()
 
-        self.thread = ConvertThread(topic, api_key, num_parts, voice, create_subtitle, whisper_model)
+        self.thread = ConvertThread(topic, api_key, num_parts, voice, create_subtitle, whisper_model, channel_name)
         self.thread.log_signal.connect(self.handle_log_signal)
         self.thread.finished_signal.connect(self.convert_finished)
         self.thread.start()
 
-    # --------------------------------------------------
-    # UI Event Handlers
-    # --------------------------------------------------
-
     def toggle_whisper_model(self, checked: bool):
         """Bật/tắt dropdown model khi checkbox được chọn/bỏ chọn"""
         self.whisper_model_selector.setEnabled(checked)
-
-    # --------------------------------------------------
-    # Slots for thread signals
-    # --------------------------------------------------
 
     def handle_log_signal(self, msg: str):
         """Log + cập nhật progress nếu msg trả về dạng ⏳ Render: xx%"""
@@ -202,10 +202,6 @@ class MainWindow(QWidget):
         self.progress_bar.setValue(100)
         self.btn_open.setEnabled(True)
         self.btn_start.setEnabled(True)
-
-    # --------------------------------------------------
-    # Misc helpers
-    # --------------------------------------------------
 
     def append_log(self, msg: str):
         self.log_output.append(msg)
