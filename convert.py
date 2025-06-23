@@ -58,6 +58,7 @@ def clean_for_tts(text: str) -> str:
     Làm sạch văn bản để chuyển sang TTS:
     - Giữ lại chữ cái (cả tiếng Việt), số và dấu câu cơ bản
     - Loại bỏ ký tự đặc biệt, dấu ngoặc, markdown...
+    - Loại bỏ các câu mời xem "tuần sau", "tập tiếp theo"
     """
     import unicodedata
 
@@ -74,6 +75,11 @@ def clean_for_tts(text: str) -> str:
     # Xóa các hướng dẫn như "Camera:..." hoặc "--- PHẦN X ---"
     text = re.sub(r"Camera.*?\.", "", text)
     text = re.split(r"(?m)^(Nếu bạn muốn|---\s*PHẦN\s*\d+\s*---)", text)[0]
+    
+    # LOẠI BỎ CÁC CÂU MỜI XEM TUẦN SAU/TẬP TIẾP THEO
+    text = re.sub(r".*?(tuần sau|tập tiếp theo|chương trình tuần tới|hẹn gặp lại.*?tuần|xem tiếp.*?tuần).*?[\.\!]", "", text, flags=re.IGNORECASE)
+    text = re.sub(r".*?(kính mời.*?xem.*?vào).*?[\.\!]", "", text, flags=re.IGNORECASE)
+    text = re.sub(r".*?(đừng quên theo dõi|đăng ký kênh).*?[\.\!]", "", text, flags=re.IGNORECASE)
 
     # Chỉ giữ lại các ký tự hợp lệ cho TTS: chữ cái (có dấu), số, dấu câu cơ bản và khoảng trắng
     text = re.sub(r"[^a-zA-ZÀ-ỹ0-9\s\.,!?:;\-…]", "", text)
@@ -206,11 +212,13 @@ def run_convert(
     outline_prompt = f"""
 Dựa trên chủ đề: '{topic}', hãy tạo một dàn ý câu chuyện cảm động CỰC KỲ CHI TIẾT để chia thành {num_parts} phân đoạn.
 
-QUAN TRỌNG: Mỗi phân đoạn phải có:
+QUAN TRỌNG: Đây là một chương trình LIỀN MẠCH được ghép thành 1 file audio duy nhất, KHÔNG phải {num_parts} tập riêng biệt.
+
+Mỗi phân đoạn phải có:
 1. Tiêu đề rõ ràng
 2. Nội dung cụ thể cần kể (3-5 câu mô tả chi tiết)
 3. Cảm xúc chính cần truyền tải
-4. Cách chuyển tiếp sang phần tiếp theo
+4. Cách chuyển tiếp sang phần tiếp theo (LIỀN MẠCH, không có "tuần sau")
 5. Nhân vật và tình huống cụ thể (nếu có)
 
 Định dạng trả về:
@@ -218,7 +226,7 @@ QUAN TRỌNG: Mỗi phân đoạn phải có:
 1. [Tiêu đề phần 1]
    Nội dung: [Mô tả cụ thể 3-5 câu về những gì sẽ kể trong phần này]
    Cảm xúc: [Cảm xúc chính cần truyền tải]
-   Chuyển tiếp: [Cách dẫn dắt sang phần tiếp theo]
+   Chuyển tiếp: [Cách dẫn dắt sang phần tiếp theo NGAY LẬP TỨC]
 
 2. [Tiêu đề phần 2]
    Nội dung: [Mô tả cụ thể...]
@@ -229,19 +237,20 @@ QUAN TRỌNG: Mỗi phân đoạn phải có:
 ```
 
 Đảm bảo:
-- Logic liên kết chặt chẽ giữa các phần
-- Mỗi phần có mục đích rõ ràng trong tổng thể câu chuyện
+- Logic liên kết chặt chẽ giữa các phần LIỀN MẠCH
+- Mỗi phần chuyển tiếp tự nhiên sang phần tiếp theo trong cùng 1 chương trình
 - Cung cấp đủ chi tiết để viết từng phần mà không bị lạc chủ đề
-- Cốt truyện phải có cung bậc cảm xúc rõ ràng (mở đầu → phát triển → cao trào → kết thúc)
+- Cốt truyện có cung bậc cảm xúc rõ ràng (mở đầu → phát triển → cao trào → kết thúc)
 """
 
     outline_messages = [
         {
             "role": "system",
             "content": (
-                "Bạn là trợ lý chuyên tạo dàn ý kịch bản chi tiết. "
+                "Bạn là trợ lý chuyên tạo dàn ý kịch bản chi tiết cho chương trình LIỀN MẠCH. "
                 "Phải tạo dàn ý CỰC KỲ CHI TIẾT để người viết có thể dễ dàng triển khai từng phần "
-                "mà không bị lạc chủ đề hoặc thiếu logic liên kết."
+                "mà không bị lạc chủ đề hoặc thiếu logic liên kết. "
+                "KHÔNG được có bất kỳ mention nào về 'tuần sau', 'tập tiếp theo' vì đây là 1 chương trình liền mạch."
             )
         },
         {"role": "user", "content": outline_prompt}
@@ -316,6 +325,7 @@ YÊU CẦU VIẾT:
 - KHÔNG lệch khỏi chủ đề hoặc thêm thông tin không liên quan
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường: . , ! ? : ;
+- ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, KHÔNG được có "tuần sau", "tập tiếp theo"
 
 Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
@@ -338,6 +348,7 @@ YÊU CẦU VIẾT:
 - Nối tiếp tự nhiên từ phần trước, KHÔNG lặp lại nội dung
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường
+- ĐÂY LÀ KẾT THÚC CHƯƠNG TRÌNH, KHÔNG có "tuần sau"
 
 Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
@@ -360,6 +371,8 @@ YÊU CẦU VIẾT:
 - Có thể sử dụng các câu giao tiếp với khán giả như "Quý vị có biết rằng...", "Điều thú vị là...", "Chúng ta cùng khám phá..."
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường
+- ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, TUYỆT ĐỐI KHÔNG được có "tuần sau", "tập tiếp theo", "kính mời xem tiếp"
+- Chuyển tiếp tự nhiên sang phần tiếp theo TRONG CÙNG CHƯƠNG TRÌNH
 
 Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
@@ -372,6 +385,7 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
                     "có khả năng kể chuyện hấp dẫn và tạo kết nối với khán giả. "
                     "PHẢI tuân thủ chặt chẽ hướng dẫn được cung cấp. "
                     "KHÔNG được lệch chủ đề hoặc tự ý thêm nội dung không liên quan. "
+                    "ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, TUYỆT ĐỐI KHÔNG được mention 'tuần sau', 'tập tiếp theo'. "
                     "CHỈ trả về nội dung câu chuyện, không thêm bất kỳ meta hay giải thích nào."
                 )
             },
