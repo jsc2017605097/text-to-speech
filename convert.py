@@ -45,6 +45,47 @@ def get_mc_info(voice: str) -> dict:
         "description": "một người dẫn chương trình chuyên nghiệp"
     })
 
+def generate_dynamic_opening(topic: str, channel_name: str, call_openrouter_func) -> str:
+    """
+    Tạo lời mở đầu động dựa trên chủ đề cụ thể
+    """
+    opening_prompt = f"""
+Tạo một lời mở đầu cực kỳ hấp dẫn và có cảm xúc cho chủ đề: "{topic}"
+
+YÊU CÁU QUAN TRỌNG:
+1. KHÔNG sử dụng tên MC hay giới thiệu kênh một cách cứng nhắc
+2. Bắt đầu bằng một câu hỏi gây tò mò HOẶC một tình huống/sự thật gây sốc liên quan trực tiếp đến chủ đề
+3. Tạo cảm giác đồng cảm, khiến người nghe cảm thấy: "Đúng rồi, tôi cũng từng thắc mắc về điều này!"
+4. Sử dụng ngôn ngữ gần gũi, không quá trang trọng
+5. Tối đa 3-4 câu, mỗi câu phải có tác dụng níu chân người xem
+6. Kết thúc bằng việc hứa hẹn sẽ tiết lộ điều gì đó thú vị
+
+VÍ DỤ PHONG CÁCH MONG MUỐN:
+- "Bạn có bao giờ thắc mắc tại sao...?"
+- "Hãy tưởng tượng bạn đang đi trên đường ở Tokyo lúc 2 giờ sáng..."
+- "Điều gì khiến một quốc gia có thể..."
+- "Có một sự thật mà 99% chúng ta không biết..."
+
+TUYỆT ĐỐI TRÁNH:
+- "Xin chào quý vị khán giả..."
+- "Tôi là MC..."
+- "Chào mừng đến với chương trình..."
+- "Hôm nay chúng ta sẽ cùng tìm hiểu..."
+
+Chỉ trả về nội dung lời mở đầu, không giải thích thêm.
+"""
+
+    messages = [
+        {
+            "role": "system", 
+            "content": "Bạn là chuyên gia viết lời mở đầu hấp dẫn cho video YouTube, biết cách tạo ra những câu hook mạnh mẽ để giữ chân người xem từ giây đầu tiên."
+        },
+        {"role": "user", "content": opening_prompt}
+    ]
+    
+    opening = call_openrouter_func(messages)
+    return opening.strip() if opening else ""
+
 def slugify(text: str) -> str:
     # Chuyển Unicode về ASCII, lowercase, thay ký tự không alnum thành dấu '-'
     text = unicodedata.normalize('NFD', text)
@@ -290,6 +331,15 @@ Mỗi phân đoạn phải có:
     
     log_func(f"📋 Đã phân tích {len(outline_sections)} phần trong dàn ý")
     
+    # Generate dynamic opening
+    log_func("\n🎭 Đang tạo lời mở đầu động và hấp dẫn...")
+    dynamic_opening = generate_dynamic_opening(topic, channel_name, call_openrouter)
+    if dynamic_opening:
+        log_func("✅ Đã tạo lời mở đầu động")
+    else:
+        log_func("⚠️ Không thể tạo lời mở đầu động, sẽ dùng mặc định")
+        dynamic_opening = ""
+    
     # Store the full story text to pass context between parts
     full_story_text = ""
     
@@ -310,28 +360,42 @@ Mỗi phân đoạn phải có:
         
         # Create detailed prompt based on part position
         if i == 0:
+            # Use dynamic opening for first part
+            opening_instruction = f"""
+SỬ DỤNG LỜI MỞ ĐẦU ĐỘNG SAU ĐÂY:
+"{dynamic_opening}"
+
+Sau đó tiếp tục phát triển nội dung theo hướng dẫn bên dưới.
+""" if dynamic_opening else """
+Tạo lời mở đầu hấp dẫn bằng cách:
+- Bắt đầu với câu hỏi gây tò mò hoặc tình huống thú vị
+- KHÔNG dùng "Xin chào quý vị khán giả" hay giới thiệu cứng nhắc
+- Tạo cảm giác đồng cảm ngay từ câu đầu tiên
+"""
+
             user_prompt_content = f"""
-Viết phần mở đầu của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
+Viết phần mở đầu của chương trình dựa trên chủ đề: '{topic}'
+
+{opening_instruction}
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
 
 YÊU CẦU VIẾT:
-- Bắt đầu bằng lời chào: "Xin chào quý vị khán giả của kênh {channel_name}! Tôi là MC {mc_name}, rất vui được gặp lại các bạn trong chương trình hôm nay."
-- Giới thiệu chủ đề một cách hấp dẫn và tạo tò mò
-- Giọng điệu của MC {mc_gender} chuyên nghiệp, thân thiện, uy tín
 - Khoảng 500 từ
+- Giọng điệu chuyên nghiệp nhưng gần gũi, tạo kết nối với khán giả
 - TUÂN THỦ CHẶT CHẼ nội dung trong hướng dẫn trên
 - KHÔNG lệch khỏi chủ đề hoặc thêm thông tin không liên quan
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường: . , ! ? : ;
 - ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, KHÔNG được có "tuần sau", "tập tiếp theo"
+- Có thể nhắc đến "{channel_name}" một cách tự nhiên nếu phù hợp, nhưng không bắt buộc
 
 Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
         elif i == num_parts - 1:
             user_prompt_content = f"""
-Viết phần kết thúc của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
+Viết phần kết thúc của chương trình dựa trên chủ đề: '{topic}'
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
@@ -342,9 +406,9 @@ NỐI TIẾP TỪ PHẦN TRƯỚC:
 YÊU CẦU VIẾT:
 - Khoảng 500 từ
 - Kết thúc có ý nghĩa, cảm động
-- Có lời cảm ơn khán giả và lời chào tạm biệt: "Cảm ơn quý vị đã theo dõi chương trình hôm nay. Hẹn gặp lại các bạn trong những chương trình tiếp theo của kênh {channel_name}. Chúc quý vị một ngày tốt lành!"
-- Giọng điệu MC {mc_gender} chuyên nghiệp, ấm áp
-- TUÂN THỦ CHẶT CHẼ nội dung trong hướng dẫn
+- Có lời cảm ơn khán giả ấm áp và tự nhiên: "Cảm ơn các bạn đã dành thời gian lắng nghe. Hy vọng những chia sẻ hôm nay đã mang lại cho các bạn những góc nhìn thú vị. Hẹn gặp lại các bạn trong những chương trình tiếp theo!"
+- Giọng điệu chuyên nghiệp, ấm áp, chân thành
+- TUÂN THỦ CHẶT CHẾ nội dung trong hướng dẫn
 - Nối tiếp tự nhiên từ phần trước, KHÔNG lặp lại nội dung
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường
@@ -354,7 +418,7 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
 """
         else:
             user_prompt_content = f"""
-Viết tiếp phần {i+1} của chương trình với vai trò MC {mc_name} của kênh "{channel_name}" dựa trên chủ đề: '{topic}'
+Viết tiếp phần {i+1} của chương trình dựa trên chủ đề: '{topic}'
 
 HƯỚNG DẪN CHI TIẾT CHO PHẦN NÀY:
 {section_guide}
@@ -364,11 +428,11 @@ NỐI TIẾP TỪ PHẦN TRƯỚC:
 
 YÊU CẦU VIẾT:
 - Khoảng 500 từ
-- Giọng điệu MC {mc_gender} chuyên nghiệp, hấp dẫn, tạo kết nối với khán giả
+- Giọng điệu chuyên nghiệp, hấp dẫn, tạo kết nối với khán giả
 - TUÂN THỦ CHẶT CHẾ nội dung trong hướng dẫn trên
 - Nối tiếp tự nhiên từ phần trước, KHÔNG lặp lại nội dung
 - Phát triển câu chuyện theo đúng hướng đã định
-- Có thể sử dụng các câu giao tiếp với khán giả như "Quý vị có biết rằng...", "Điều thú vị là...", "Chúng ta cùng khám phá..."
+- Có thể sử dụng các câu giao tiếp với khán giả như "Bạn có biết rằng...", "Điều thú vị là...", "Hãy cùng khám phá..."
 - KHÔNG sử dụng ký hiệu đặc biệt, dấu ngoặc, markdown
 - Chỉ dùng dấu câu thông thường
 - ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, TUYỆT ĐỐI KHÔNG được có "tuần sau", "tập tiếp theo", "kính mời xem tiếp"
@@ -381,8 +445,8 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
             {
                 "role": "system",
                 "content": (
-                    f"Bạn là MC {mc_name} của kênh '{channel_name}' - {mc_description}, "
-                    "có khả năng kể chuyện hấp dẫn và tạo kết nối với khán giả. "
+                    f"Bạn là một người dẫn chương trình chuyên nghiệp của kênh '{channel_name}', "
+                    "có khả năng kể chuyện hấp dẫn và tạo kết nối mạnh mẽ với khán giả. "
                     "PHẢI tuân thủ chặt chẽ hướng dẫn được cung cấp. "
                     "KHÔNG được lệch chủ đề hoặc tự ý thêm nội dung không liên quan. "
                     "ĐÂY LÀ CHƯƠNG TRÌNH LIỀN MẠCH, TUYỆT ĐỐI KHÔNG được mention 'tuần sau', 'tập tiếp theo'. "
@@ -406,6 +470,8 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
         # Save raw content
         with open(output_script, "a", encoding="utf-8") as f:
             f.write(f"\n--- PHẦN {i+1} ---\n")
+            if i == 0 and dynamic_opening:
+                f.write(f"[Lời mở đầu động: {dynamic_opening}]\n\n")
             f.write(reply.strip() + "\n")
 
         # Clean and save for TTS
@@ -430,7 +496,6 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
     )
     
     log_func(f"\n🎉 Hoàn tất!")
-    log_func(f"🎭 MC: {mc_name} ({mc_gender})")
     log_func(f"📺 Kênh: {channel_name}")
     log_func(f"📄 Dàn ý chi tiết: {output_outline}")
     log_func(f"📝 Kịch bản gốc: {output_script}")
