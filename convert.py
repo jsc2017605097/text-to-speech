@@ -195,6 +195,33 @@ def parse_detailed_outline(outline_content: str) -> list:
     
     return outline_points
 
+def generate_chapter_timestamps(outline_sections: list, output_dir: str, base_filename: str):
+    chapter_lines = []
+    current_time_ms = 0
+
+    for idx, section in enumerate(outline_sections):
+        # Load thời lượng audio tương ứng
+        audio_file = os.path.join(output_dir, f"{base_filename}-part-{idx+1}.mp3")
+        if not os.path.exists(audio_file):
+            continue
+
+        audio = AudioSegment.from_file(audio_file)
+        timestamp = time.strftime('%M:%S', time.gmtime(current_time_ms // 1000))
+        
+        # Lấy tiêu đề ngắn gọn
+        title_line = section.get('title', f"Phần {idx+1}")
+        chapter_lines.append(f"{timestamp} - {title_line.strip()}")
+
+        current_time_ms += len(audio)
+
+    chapter_text = '\n'.join(chapter_lines)
+    chapter_file = os.path.join(output_dir, f"{base_filename}-chapters.txt")
+    with open(chapter_file, "w", encoding="utf-8") as f:
+        f.write(chapter_text)
+
+    return chapter_file
+
+
 def run_convert(
     topic: str,
     api_key: str,
@@ -494,6 +521,11 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
         os.path.join(output_dir, f"{base}-part-{{}}.mp3"),
         num_parts
     )
+
+        # Tạo chương trình chapter YouTube
+    chapter_file = generate_chapter_timestamps(outline_sections, output_dir, base)
+    log_func(f"📍 Đã tạo file chapter: {chapter_file}")
+
     
     log_func(f"\n🎉 Hoàn tất!")
     log_func(f"📺 Kênh: {channel_name}")
@@ -504,10 +536,3 @@ Chỉ trả về nội dung câu chuyện, không thêm giải thích hay meta.
     
     return final_audio
 
-
-if __name__ == "__main__":
-    TEST_KEY = "sk-or-v1-your_api_key_here"  # Thay thế bằng API key thật của bạn
-    TEST_TOPIC = "Tại Sao Nhật Bản Gần Như Không Có Trộm Cắp?"
-    
-    # Test với 25 phần như bạn thường yêu cầu
-    run_convert(TEST_TOPIC, TEST_KEY, num_parts=25)
