@@ -71,7 +71,7 @@ class MainWindow(QWidget):
 
         # ---------- Tên kênh ----------
         layout.addWidget(QLabel("📺 Tên kênh:"))
-        self.channel_name_input = QLineEdit("Tinh Hoa Á Đông")
+        self.channel_name_input = QLineEdit("Pháp Âm Bình An")
         layout.addWidget(self.channel_name_input)
 
         # ---------- Thông tin tạo audio ----------
@@ -156,10 +156,6 @@ class MainWindow(QWidget):
 
         if not channel_name:
             self.append_log("⚠️ Vui lòng nhập tên kênh!")
-            self.btn_start.setEnabled(True)
-            return
-        if not topic:
-            self.append_log("⚠️ Vui lòng nhập chủ đề!")
             self.btn_start.setEnabled(True)
             return
         if not api_key:
