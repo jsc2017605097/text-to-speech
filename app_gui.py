@@ -92,8 +92,8 @@ class MainWindow(QWidget):
         self.voice_selector = QComboBox()
         self.voice_selector.addItems(
             [
-                "Nữ - vi-VN-HoaiMyNeural",
                 "Nam - vi-VN-NamMinhNeural",
+                "Nữ - vi-VN-HoaiMyNeural"
             ]
         )
         layout.addWidget(self.voice_selector)
