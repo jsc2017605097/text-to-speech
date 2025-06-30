@@ -1,8 +1,9 @@
 import sys
 import os
+import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QComboBox, QFileDialog, QSpinBox, QHBoxLayout
+    QPushButton, QTextEdit, QComboBox, QFileDialog, QHBoxLayout
 )
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
@@ -13,30 +14,21 @@ class ConvertThread(QThread):
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, input_file: str, voice: str, split_method: str, max_value: int):
+    def __init__(self, input_file: str, voice: str):
         super().__init__()
         self.input_file = input_file
         self.voice = voice
-        self.split_method = split_method
-        self.max_value = max_value
 
     def run(self):
         def log_func(msg: str):
             self.log_signal.emit(msg)
 
-        kwargs = {
-            "input_file": self.input_file,
-            "voice": self.voice,
-            "split_method": self.split_method,
-            "log_func": log_func
-        }
-        if self.split_method == "length":
-            kwargs["max_length"] = self.max_value
-        else:
-            kwargs["max_sentences"] = self.max_value
-
         try:
-            output_file = convert_text_file_to_speech(**kwargs)
+            output_file = convert_text_file_to_speech(
+                input_file=self.input_file,
+                voice=self.voice,
+                log_func=log_func
+            )
             if output_file:
                 self.finished_signal.emit(output_file)
             else:
@@ -79,24 +71,6 @@ class MainWindow(QWidget):
         ])
         layout.addWidget(self.voice_selector)
 
-        # Phương pháp chia
-        layout.addWidget(QLabel("🔧 Cách chia văn bản:"))
-        self.split_selector = QComboBox()
-        self.split_selector.addItems([
-            "Theo độ dài ký tự",
-            "Theo số câu"
-        ])
-        self.split_selector.currentIndexChanged.connect(self.update_limit_label)
-        layout.addWidget(self.split_selector)
-
-        # Tham số tối đa
-        self.limit_label = QLabel("Độ dài tối đa mỗi phần:")
-        layout.addWidget(self.limit_label)
-        self.limit_input = QSpinBox()
-        self.limit_input.setRange(100, 10000)
-        self.limit_input.setValue(5000)
-        layout.addWidget(self.limit_input)
-
         # Nút bắt đầu
         self.btn_start = QPushButton("🚀 Bắt đầu chuyển đổi")
         self.btn_start.clicked.connect(self.start_convert)
@@ -107,20 +81,18 @@ class MainWindow(QWidget):
         self.log_output.setReadOnly(True)
         layout.addWidget(self.log_output)
 
+        # Nút mở thư mục
+        self.btn_open_folder = QPushButton("📂 Mở thư mục chứa file audio")
+        self.btn_open_folder.setEnabled(False)
+        self.btn_open_folder.clicked.connect(self.open_output_folder)
+        layout.addWidget(self.btn_open_folder)
+
         self.setLayout(layout)
 
     def browse_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Chọn file .txt", "", "Text Files (*.txt)")
         if file_path:
             self.file_input.setText(file_path)
-
-    def update_limit_label(self):
-        if self.split_selector.currentIndex() == 0:
-            self.limit_label.setText("Độ dài tối đa mỗi phần:")
-            self.limit_input.setValue(5000)
-        else:
-            self.limit_label.setText("Số câu tối đa mỗi phần:")
-            self.limit_input.setValue(50)
 
     def start_convert(self):
         input_file = self.file_input.text().strip()
@@ -129,13 +101,12 @@ class MainWindow(QWidget):
             return
 
         voice = self.voice_selector.currentText().split(" - ")[1]
-        split_method = "length" if self.split_selector.currentIndex() == 0 else "sentences"
-        max_value = self.limit_input.value()
 
         self.append_log("🔄 Bắt đầu chuyển đổi...")
         self.btn_start.setEnabled(False)
+        self.btn_open_folder.setEnabled(False)
 
-        self.thread = ConvertThread(input_file, voice, split_method, max_value)
+        self.thread = ConvertThread(input_file, voice)
         self.thread.log_signal.connect(self.append_log)
         self.thread.finished_signal.connect(self.convert_finished)
         self.thread.start()
@@ -146,6 +117,17 @@ class MainWindow(QWidget):
     def convert_finished(self, output_path: str):
         self.append_log(f"\n✅ Đã tạo file audio: {output_path}")
         self.btn_start.setEnabled(True)
+        self.output_folder = os.path.dirname(output_path)
+        self.btn_open_folder.setEnabled(True)
+
+    def open_output_folder(self):
+        if hasattr(self, "output_folder") and os.path.exists(self.output_folder):
+            if sys.platform == "win32":
+                os.startfile(self.output_folder)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", self.output_folder])
+            else:
+                subprocess.Popen(["xdg-open", self.output_folder])
 
 
 if __name__ == "__main__":
