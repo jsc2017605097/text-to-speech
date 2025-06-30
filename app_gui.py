@@ -2,217 +2,150 @@ import sys
 import os
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QComboBox, QProgressBar, QCheckBox
+    QPushButton, QTextEdit, QComboBox, QFileDialog, QSpinBox, QHBoxLayout
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
-from convert import run_convert
-from subtitle_generator import generate_subtitle
+from convert import convert_text_file_to_speech
 
 
 class ConvertThread(QThread):
-    """Thread tạo AUDIO (mp3) từ chủ đề và có thể tạo phụ đề"""
-
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, topic: str, api_key: str, num_parts: int, voice: str, create_subtitle: bool, whisper_model: str, channel_name: str) -> None:
+    def __init__(self, input_file: str, voice: str, split_method: str, max_value: int):
         super().__init__()
-        self.topic = topic
-        self.api_key = api_key
-        self.num_parts = num_parts
+        self.input_file = input_file
         self.voice = voice
-        self.create_subtitle = create_subtitle
-        self.whisper_model = whisper_model
-        self.channel_name = channel_name
+        self.split_method = split_method
+        self.max_value = max_value
 
     def run(self):
         def log_func(msg: str):
             self.log_signal.emit(msg)
 
+        kwargs = {
+            "input_file": self.input_file,
+            "voice": self.voice,
+            "split_method": self.split_method,
+            "log_func": log_func
+        }
+        if self.split_method == "length":
+            kwargs["max_length"] = self.max_value
+        else:
+            kwargs["max_sentences"] = self.max_value
+
         try:
-            final_audio = run_convert(
-                self.topic,
-                self.api_key,
-                self.num_parts,
-                log_func=log_func,
-                voice=self.voice,
-                channel_name=self.channel_name
-            )
-            self.log_signal.emit("✅ Hoàn tất tạo audio!")
-            
-            # Tạo phụ đề nếu được chọn
-            if self.create_subtitle:
-                self.log_signal.emit("🎬 Đang tạo phụ đề...")
-                try:
-                    subtitle_file = generate_subtitle(final_audio, self.whisper_model, log_func)
-                    self.log_signal.emit(f"✅ Đã tạo phụ đề: {subtitle_file}")
-                except Exception as e:
-                    self.log_signal.emit(f"❌ Lỗi tạo phụ đề: {e}")
-                    
-            self.finished_signal.emit(final_audio)
+            output_file = convert_text_file_to_speech(**kwargs)
+            if output_file:
+                self.finished_signal.emit(output_file)
+            else:
+                self.log_signal.emit("❌ Chuyển đổi thất bại.")
         except Exception as e:
             self.log_signal.emit(f"❌ Lỗi: {e}")
 
 
 class MainWindow(QWidget):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
-        self.setWindowTitle("Dâu Tây Audio Maker")
+        self.setWindowTitle("Text to Speech")
 
-        # Icon khi đóng gói PyInstaller (tuỳ chọn)
         base_path = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.abspath(".")
-        icon_path = os.path.join(base_path, "dautay.ico")
+        icon_path = os.path.join(base_path, "tts.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        self.resize(500, 600)
+        self.resize(500, 500)
         layout = QVBoxLayout()
 
-        # ---------- Tên kênh ----------
-        layout.addWidget(QLabel("📺 Tên kênh:"))
-        self.channel_name_input = QLineEdit("Pháp Âm Bình An")
-        layout.addWidget(self.channel_name_input)
+        # Chọn file
+        layout.addWidget(QLabel("📄 File .txt đầu vào:"))
+        file_layout = QHBoxLayout()
+        self.file_input = QLineEdit()
+        file_layout.addWidget(self.file_input)
+        btn_browse = QPushButton("🔍 Chọn file")
+        btn_browse.clicked.connect(self.browse_file)
+        file_layout.addWidget(btn_browse)
+        layout.addLayout(file_layout)
 
-        # ---------- Thông tin tạo audio ----------
-        layout.addWidget(QLabel("🎯 Chủ đề:"))
-        self.topic_input = QLineEdit()
-        layout.addWidget(self.topic_input)
-
-        layout.addWidget(QLabel("🔑 API Key:"))
-        self.api_key_input = QLineEdit()
-        self.api_key_input.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.api_key_input)
-
-        layout.addWidget(QLabel("📑 Số phần câu chuyện:"))
-        self.num_parts_input = QLineEdit("10")
-        layout.addWidget(self.num_parts_input)
-
-        layout.addWidget(QLabel("🎤 Chọn giọng đọc:"))
+        # Chọn giọng
+        layout.addWidget(QLabel("🎤 Giọng đọc:"))
         self.voice_selector = QComboBox()
-        self.voice_selector.addItems(
-            [
-                "Nam - vi-VN-NamMinhNeural",
-                "Nữ - vi-VN-HoaiMyNeural"
-            ]
-        )
+        self.voice_selector.addItems([
+            "Nam Minh - vi-VN-NamMinhNeural",
+            "Hoài My - vi-VN-HoaiMyNeural",
+            "Tuấn - vi-VN-TuanNeural",
+            "Vy - vi-VN-VyNeural"
+        ])
         layout.addWidget(self.voice_selector)
 
-        # ---------- Tùy chọn tạo phụ đề ----------
-        self.subtitle_checkbox = QCheckBox("🎬 Tạo phụ đề (SRT file)")
-        self.subtitle_checkbox.setChecked(False)
-        self.subtitle_checkbox.toggled.connect(self.toggle_whisper_model)
-        layout.addWidget(self.subtitle_checkbox)
-
-        layout.addWidget(QLabel("🤖 Whisper Model:"))
-        self.whisper_model_selector = QComboBox()
-        self.whisper_model_selector.addItems([
-            "tiny - Nhanh nhất, chất lượng thấp (~39MB)",
-            "base - Cân bằng tốc độ và chất lượng (~74MB)", 
-            "small - Chất lượng tốt (~244MB)",
-            "medium - Chất lượng cao (~769MB)",
-            "large - Chất lượng tốt nhất (~1550MB)"
+        # Phương pháp chia
+        layout.addWidget(QLabel("🔧 Cách chia văn bản:"))
+        self.split_selector = QComboBox()
+        self.split_selector.addItems([
+            "Theo độ dài ký tự",
+            "Theo số câu"
         ])
-        self.whisper_model_selector.setCurrentIndex(1)  # Default: base
-        self.whisper_model_selector.setEnabled(False)  # Disable ban đầu
-        layout.addWidget(self.whisper_model_selector)
+        self.split_selector.currentIndexChanged.connect(self.update_limit_label)
+        layout.addWidget(self.split_selector)
 
-        # ---------- Progress & log ----------
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
+        # Tham số tối đa
+        self.limit_label = QLabel("Độ dài tối đa mỗi phần:")
+        layout.addWidget(self.limit_label)
+        self.limit_input = QSpinBox()
+        self.limit_input.setRange(100, 10000)
+        self.limit_input.setValue(5000)
+        layout.addWidget(self.limit_input)
 
+        # Nút bắt đầu
+        self.btn_start = QPushButton("🚀 Bắt đầu chuyển đổi")
+        self.btn_start.clicked.connect(self.start_convert)
+        layout.addWidget(self.btn_start)
+
+        # Log
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         layout.addWidget(self.log_output)
 
-        # ---------- Nút action ----------
-        self.btn_start = QPushButton("🚀 Tạo Audio")
-        self.btn_start.clicked.connect(self.start_convert)
-        layout.addWidget(self.btn_start)
-
-        self.btn_open = QPushButton("📂 Mở thư mục kết quả")
-        self.btn_open.setEnabled(False)
-        self.btn_open.clicked.connect(self.open_output_folder)
-        layout.addWidget(self.btn_open)
-
         self.setLayout(layout)
 
-        # ---------- State ----------
-        self.final_output_file: str | None = None
+    def browse_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Chọn file .txt", "", "Text Files (*.txt)")
+        if file_path:
+            self.file_input.setText(file_path)
+
+    def update_limit_label(self):
+        if self.split_selector.currentIndex() == 0:
+            self.limit_label.setText("Độ dài tối đa mỗi phần:")
+            self.limit_input.setValue(5000)
+        else:
+            self.limit_label.setText("Số câu tối đa mỗi phần:")
+            self.limit_input.setValue(50)
 
     def start_convert(self):
-        self.log_output.clear()
-        self.progress_bar.setValue(0)
+        input_file = self.file_input.text().strip()
+        if not input_file or not os.path.exists(input_file):
+            self.append_log("❌ Vui lòng chọn file .txt hợp lệ.")
+            return
+
+        voice = self.voice_selector.currentText().split(" - ")[1]
+        split_method = "length" if self.split_selector.currentIndex() == 0 else "sentences"
+        max_value = self.limit_input.value()
+
+        self.append_log("🔄 Bắt đầu chuyển đổi...")
         self.btn_start.setEnabled(False)
-        self.btn_open.setEnabled(False)
 
-        # Validate input
-        channel_name = self.channel_name_input.text().strip()
-        topic = self.topic_input.text().strip()
-        api_key = self.api_key_input.text().strip()
-        num_parts_str = self.num_parts_input.text().strip()
-
-        if not channel_name:
-            self.append_log("⚠️ Vui lòng nhập tên kênh!")
-            self.btn_start.setEnabled(True)
-            return
-        if not api_key:
-            self.append_log("⚠️ Vui lòng nhập API Key!")
-            self.btn_start.setEnabled(True)
-            return
-        if not num_parts_str.isdigit() or int(num_parts_str) < 1:
-            self.append_log("⚠️ Số phần không hợp lệ!")
-            self.btn_start.setEnabled(True)
-            return
-
-        num_parts = int(num_parts_str)
-        voice = self.voice_selector.currentText().split(" - ")[1].strip()
-        create_subtitle = self.subtitle_checkbox.isChecked()
-        whisper_model = self.whisper_model_selector.currentText().split(" - ")[0].strip()
-
-        self.thread = ConvertThread(topic, api_key, num_parts, voice, create_subtitle, whisper_model, channel_name)
-        self.thread.log_signal.connect(self.handle_log_signal)
+        self.thread = ConvertThread(input_file, voice, split_method, max_value)
+        self.thread.log_signal.connect(self.append_log)
         self.thread.finished_signal.connect(self.convert_finished)
         self.thread.start()
-
-    def toggle_whisper_model(self, checked: bool):
-        """Bật/tắt dropdown model khi checkbox được chọn/bỏ chọn"""
-        self.whisper_model_selector.setEnabled(checked)
-
-    def handle_log_signal(self, msg: str):
-        """Log + cập nhật progress nếu msg trả về dạng ⏳ Render: xx%"""
-        if msg.startswith("⏳ Render:"):
-            try:
-                percent_str = msg.split("⏳ Render:")[1].strip().replace("%", "")
-                self.progress_bar.setValue(int(float(percent_str)))
-            except Exception:
-                self.log_output.append(msg)
-        else:
-            self.log_output.append(msg)
-
-    def convert_finished(self, output_file: str):
-        self.final_output_file = output_file
-        self.append_log(f"✅ Đã tạo audio: {output_file}")
-        self.progress_bar.setValue(100)
-        self.btn_open.setEnabled(True)
-        self.btn_start.setEnabled(True)
 
     def append_log(self, msg: str):
         self.log_output.append(msg)
 
-    def open_output_folder(self):
-        if self.final_output_file and os.path.exists(self.final_output_file):
-            folder = os.path.dirname(self.final_output_file)
-            if sys.platform.startswith("win"):
-                os.startfile(folder)
-            elif sys.platform == "darwin":
-                os.system(f"open '{folder}'")
-            else:
-                os.system(f"xdg-open '{folder}'")
-        else:
-            self.append_log("⚠️ Không tìm thấy file.")
+    def convert_finished(self, output_path: str):
+        self.append_log(f"\n✅ Đã tạo file audio: {output_path}")
+        self.btn_start.setEnabled(True)
 
 
 if __name__ == "__main__":
