@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import time
+import random
 
 # Xác định đường dẫn ffmpeg khi đóng gói
 if getattr(sys, 'frozen', False):
@@ -29,10 +30,6 @@ def clean_for_tts(text: str) -> str:
 
 
 def split_text_by_chapters(text: str) -> list[tuple[str, str]]:
-    """
-    Tách văn bản theo các dòng tiêu đề dạng: # Tiêu đề chương #
-    Trả về danh sách (tiêu đề, nội dung) – phần tiêu đề không được đưa vào audio
-    """
     pattern = r"#\s*(.*?)\s*#"
     matches = list(re.finditer(pattern, text))
     parts = []
@@ -123,7 +120,6 @@ def convert_text_file_to_speech(
         f.write(cleaned_text)
     log_func(f"✅ Đã lưu text làm sạch: {cleaned_file}")
 
-    # CHIA THEO CHƯƠNG (DẤU #)
     chapter_parts = split_text_by_chapters(cleaned_text)
     if not chapter_parts:
         log_func("❌ Không phát hiện chương nào. Đảm bảo mỗi chương bắt đầu bằng dòng: # tiêu đề #")
@@ -143,7 +139,11 @@ def convert_text_file_to_speech(
             audio_files.append(part_audio)
         else:
             log_func(f"❌ Lỗi tạo chương {i}")
-        time.sleep(1)
+
+        # Delay ngẫu nhiên từ 1.5–3.0 giây
+        delay = random.uniform(1.5, 3.0)
+        log_func(f"⏳ Chờ {delay:.1f} giây để tránh spam...")
+        time.sleep(delay)
 
     if not audio_files:
         log_func("❌ Không tạo được file audio nào")
@@ -155,7 +155,6 @@ def convert_text_file_to_speech(
         log_func(f"🎵 File audio cuối cùng: {final_audio}")
 
         try:
-            # Ghi file chapter
             timestamps = []
             current_time_ms = 0
             for audio_file in audio_files:
