@@ -1,11 +1,12 @@
 import sys
 import os
+import re
 import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QComboBox, QFileDialog, QHBoxLayout
+    QPushButton, QTextEdit, QComboBox, QFileDialog, QHBoxLayout, QSlider
 )
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon
 from convert import convert_text_file_to_speech
 
@@ -14,10 +15,11 @@ class ConvertThread(QThread):
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(str)
 
-    def __init__(self, input_file: str, voice: str):
+    def __init__(self, input_file: str, voice: str, rate: str):
         super().__init__()
         self.input_file = input_file
         self.voice = voice
+        self.rate = rate
 
     def run(self):
         def log_func(msg: str):
@@ -27,6 +29,7 @@ class ConvertThread(QThread):
             output_file = convert_text_file_to_speech(
                 input_file=self.input_file,
                 voice=self.voice,
+                rate=self.rate,
                 log_func=log_func
             )
             if output_file:
@@ -47,10 +50,10 @@ class MainWindow(QWidget):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        self.resize(500, 500)
+        self.resize(500, 550)
         layout = QVBoxLayout()
 
-        # Chọn file
+        # File chọn
         layout.addWidget(QLabel("📄 File .txt đầu vào:"))
         file_layout = QHBoxLayout()
         self.file_input = QLineEdit()
@@ -60,7 +63,7 @@ class MainWindow(QWidget):
         file_layout.addWidget(btn_browse)
         layout.addLayout(file_layout)
 
-        # Chọn giọng
+        # Giọng đọc
         layout.addWidget(QLabel("🎤 Giọng đọc:"))
         self.voice_selector = QComboBox()
         self.voice_selector.addItems([
@@ -70,6 +73,20 @@ class MainWindow(QWidget):
             "Vy - vi-VN-VyNeural"
         ])
         layout.addWidget(self.voice_selector)
+
+        # Tốc độ đọc
+        layout.addWidget(QLabel("⏩ Tốc độ đọc:"))
+        self.speed_slider = QSlider(Qt.Horizontal)
+        self.speed_slider.setMinimum(-100)
+        self.speed_slider.setMaximum(100)
+        self.speed_slider.setValue(0)
+        self.speed_slider.setTickInterval(25)
+        self.speed_slider.setTickPosition(QSlider.TicksBelow)
+        self.speed_slider.valueChanged.connect(self.update_speed_label)
+        layout.addWidget(self.speed_slider)
+
+        self.speed_label = QLabel("Tốc độ: 0%")
+        layout.addWidget(self.speed_label)
 
         # Nút bắt đầu
         self.btn_start = QPushButton("🚀 Bắt đầu chuyển đổi")
@@ -94,6 +111,10 @@ class MainWindow(QWidget):
         if file_path:
             self.file_input.setText(file_path)
 
+    def update_speed_label(self):
+        value = self.speed_slider.value()
+        self.speed_label.setText(f"Tốc độ: {value:+d}%")
+
     def start_convert(self):
         input_file = self.file_input.text().strip()
         if not input_file or not os.path.exists(input_file):
@@ -101,12 +122,13 @@ class MainWindow(QWidget):
             return
 
         voice = self.voice_selector.currentText().split(" - ")[1]
+        rate = f"{self.speed_slider.value()}%"
 
-        self.append_log("🔄 Bắt đầu chuyển đổi...")
+        self.append_log(f"🔄 Bắt đầu chuyển đổi với tốc độ {rate}...")
         self.btn_start.setEnabled(False)
         self.btn_open_folder.setEnabled(False)
 
-        self.thread = ConvertThread(input_file, voice)
+        self.thread = ConvertThread(input_file, voice, rate)
         self.thread.log_signal.connect(self.append_log)
         self.thread.finished_signal.connect(self.convert_finished)
         self.thread.start()

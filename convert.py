@@ -8,7 +8,6 @@ import re
 import time
 import random
 
-# Xác định đường dẫn ffmpeg khi đóng gói
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     ffmpeg_path = os.path.join(base_path, "ffmpeg.exe")
@@ -24,7 +23,7 @@ def clean_for_tts(text: str) -> str:
     text = re.sub(r"[\(\)\[\]\{\}<>\"""''']", "", text)
     text = re.sub(r"Camera.*?\.", "", text)
     text = re.sub(r"(?m)^---.*?---", "", text)
-    text = re.sub(r"[^a-zA-ZÀ-ỹ0-9\s\.,!?:;\-…#]", "", text)  # giữ dấu #
+    text = re.sub(r"[^a-zA-ZÀ-ỹ0-9\s\.,!?:;\-…#]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -44,9 +43,9 @@ def split_text_by_chapters(text: str) -> list[tuple[str, str]]:
     return parts
 
 
-async def create_audio_from_text(text: str, output_path: str, voice: str = "vi-VN-NamMinhNeural"):
+async def create_audio_from_text(text: str, output_path: str, voice: str = "vi-VN-NamMinhNeural", rate: str = "0%"):
     try:
-        communicate = edge_tts.Communicate(text=text, voice=voice)
+        communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate)
         await communicate.save(output_path)
         return True
     except Exception as e:
@@ -85,6 +84,7 @@ def convert_text_file_to_speech(
     input_file: str,
     output_dir: str = None,
     voice: str = "vi-VN-NamMinhNeural",
+    rate: str = "0%",
     log_func=print
 ) -> str:
     if not os.path.exists(input_file):
@@ -98,7 +98,7 @@ def convert_text_file_to_speech(
     base_name = os.path.splitext(os.path.basename(input_file))[0]
 
     log_func(f"🚀 Bắt đầu convert: {input_file}")
-    log_func(f"🎤 Giọng đọc: {voice}")
+    log_func(f"🎤 Giọng đọc: {voice} | Tốc độ: {rate}")
     log_func(f"📁 Thư mục output: {output_dir}")
 
     try:
@@ -133,14 +133,13 @@ def convert_text_file_to_speech(
     for i, part in enumerate(text_parts, 1):
         log_func(f"\n🟡 Đang xử lý chương {i}/{len(text_parts)}: {chapter_titles[i-1]}")
         part_audio = os.path.join(output_dir, f"{base_name}-part-{i:03d}.mp3")
-        success = asyncio.run(create_audio_from_text(part, part_audio, voice))
+        success = asyncio.run(create_audio_from_text(part, part_audio, voice, rate))
         if success:
             log_func(f"✅ Đã tạo: {os.path.basename(part_audio)}")
             audio_files.append(part_audio)
         else:
             log_func(f"❌ Lỗi tạo chương {i}")
 
-        # Delay ngẫu nhiên từ 1.5–3.0 giây
         delay = random.uniform(1.5, 3.0)
         log_func(f"⏳ Chờ {delay:.1f} giây để tránh spam...")
         time.sleep(delay)
